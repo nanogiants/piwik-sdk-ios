@@ -256,6 +256,9 @@ static PiwikTracker *_sharedInstance;
     
     _locationManager = [[PiwikLocationManager alloc] init];    
     _includeLocationInformation = NO;
+      
+    self.requestSerializer = [AFJSONRequestSerializer serializer];
+    self.responseSerializer = [AFJSONResponseSerializer serializer];
     
     // Set default user defatult values
     NSDictionary *defaultValues = @{PiwikUserDefaultOptOutKey : @NO};
@@ -293,16 +296,6 @@ static PiwikTracker *_sharedInstance;
 }
 
 
-// Overwritten from AFHTTPClient
-- (NSMutableURLRequest*)requestWithMethod:(NSString *)method path:(NSString *)path parameters:(NSDictionary *)parameters {
-  
-  NSMutableURLRequest *request = [super requestWithMethod:method path:path parameters:parameters];
-
-  // Reduce request timeout
-  request.timeoutInterval = PiwikHTTPRequestTimeout;
-  
-  return request;
-}
 
 
 - (void)startDispatchTimer {
@@ -969,8 +962,7 @@ static PiwikTracker *_sharedInstance;
             
         }];
         
-        [self enqueueHTTPRequestOperation:operation];
-        
+          [self.operationQueue addOperation:operation];
       }
       
     }
@@ -984,17 +976,15 @@ static PiwikTracker *_sharedInstance;
   
   NSMutableURLRequest *request = nil;
   
-  if (events.count == 1) {
-    
-    // Send event as query string
-    self.parameterEncoding = AFFormURLParameterEncoding;
-    
-    request = [self requestWithMethod:@"GET" path:@"piwik.php" parameters:[events objectAtIndex:0]];
-    
-  } else {
+    if (events.count == 1)
+         {
+             self.requestSerializer = [AFHTTPRequestSerializer serializer];
+             request = [self.requestSerializer requestWithMethod:@"GET" URLString:[[NSURL URLWithString:@"piwik.php" relativeToURL:self.baseURL] absoluteString] parameters:[events objectAtIndex:0] error:nil];
+    } else
+         {
     
     // Send events as JSON
-    self.parameterEncoding = AFJSONParameterEncoding;
+    self.requestSerializer = [AFJSONRequestSerializer serializer];
     
     NSMutableDictionary *JSONParams = [NSMutableDictionary dictionaryWithCapacity:2];
     
@@ -1035,7 +1025,8 @@ static PiwikTracker *_sharedInstance;
     JSONParams[@"requests"] = queryStrings;
 //    DLog(@"Bulk request:\n%@", JSONParams);
     
-    request = [self requestWithMethod:@"POST" path:@"piwik.php" parameters:JSONParams];
+    request = [self.requestSerializer requestWithMethod:@"POST" URLString:[[NSURL URLWithString:@"piwik.php" relativeToURL:self.baseURL] absoluteString] parameters:JSONParams error:nil];
+
     
   }
   
